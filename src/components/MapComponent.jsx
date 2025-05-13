@@ -15,8 +15,8 @@ const containerStyle = {
 };
 
 const centerFallback = {
-  lat: 40.7128,
-  lng: -74.006,
+  lat: 4.912737,
+  lng: 67.121555,
 };
 
 function MapComponent({ onLocationSelect, providers = [], showProviders = false }) {
