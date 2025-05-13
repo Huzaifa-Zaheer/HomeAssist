@@ -15,7 +15,7 @@ const containerStyle = {
 };
 
 const centerFallback = {
-  lat: 4.912737,
+  lat: 24.912737,
   lng: 67.121555,
 };
 
