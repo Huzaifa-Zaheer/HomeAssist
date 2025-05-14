@@ -19,6 +19,18 @@ const centerFallback = {
   lng: 67.121555,
 };
 
+async function snapToRoad({ lat, lng }, apiKey) {
+  const url = `https://roads.googleapis.com/v1/snapToRoads?path=${lat},${lng}&interpolate=false&key=${apiKey}`;
+  const response = await fetch(url);
+  const data = await response.json();
+  if (data.snappedPoints && data.snappedPoints.length > 0) {
+    const snapped = data.snappedPoints[0].location;
+    return { lat: snapped.latitude, lng: snapped.longitude };
+  }
+  // fallback to original if no snap
+  return { lat, lng };
+}
+
 function MapComponent({ onLocationSelect, providers = [], showProviders = false }) {
   const [currentLocation, setCurrentLocation] = useState(null);
   const [directions, setDirections] = useState(null);
@@ -83,37 +95,51 @@ function MapComponent({ onLocationSelect, providers = [], showProviders = false 
   useEffect(() => {
     if (!selectedProvider || !currentLocation) return;
 
-    const directionsService = new window.google.maps.DirectionsService();
+    async function getSnappedRoute() {
+      const apiKey = "AIzaSyA3FzKFHiA7bUcmOaubinG6wqCZt8Dw7Yk";
+      const snappedOrigin = await snapToRoad(currentLocation, apiKey);
+      const snappedDestination = await snapToRoad(
+        { lat: selectedProvider.lat, lng: selectedProvider.lng },
+        apiKey
+      );
 
-    directionsService.route(
-      {
-        origin: currentLocation,
-        destination: {
-          lat: selectedProvider.lat,
-          lng: selectedProvider.lng,
+      const directionsService = new window.google.maps.DirectionsService();
+      directionsService.route(
+        {
+          origin: snappedOrigin,
+          destination: snappedDestination,
+          travelMode: window.google.maps.TravelMode.DRIVING,
+          provideRouteAlternatives: false,
+          drivingOptions: {
+            departureTime: new Date(),
+            trafficModel: "bestguess",
+          },
+          optimizeWaypoints: true,
         },
-        travelMode: window.google.maps.TravelMode.DRIVING,
-      },
-      (result, status) => {
-        if (status === "OK") {
-          setDirections(result);
-          const leg = result.routes[0].legs[0];
-          console.log("📏 Distance:", leg.distance.text);
-          console.log("⏱ Duration:", leg.duration.text);
-        } else {
-          console.error("❌ Directions request failed:", status);
+        (result, status) => {
+          if (status === "OK") {
+            setDirections(result);
+            const leg = result.routes[0].legs[0];
+            console.log("📏 Distance:", leg.distance.text);
+            console.log("⏱ Duration:", leg.duration.text);
+          } else {
+            console.error("❌ Directions request failed:", status);
+          }
         }
-      }
-    );
+      );
+    }
+
+    getSnappedRoute();
   }, [selectedProvider, currentLocation]);
 
-  const handleMapClick = (e) => {
+  const handleMapClick = async (e) => {
     const latLng = {
       lat: e.latLng.lat(),
       lng: e.latLng.lng(),
     };
-    console.log("📍 Location selected:", latLng);
-    onLocationSelect(latLng);
+    const apiKey = "AIzaSyA3FzKFHiA7bUcmOaubinG6wqCZt8Dw7Yk";
+    const snappedLatLng = await snapToRoad(latLng, apiKey);
+    onLocationSelect(snappedLatLng);
   };
 
   const handleProviderClick = (provider) => {
