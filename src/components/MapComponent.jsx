@@ -19,6 +19,13 @@ const centerFallback = {
   lng: 67.121555,
 };
 
+const SERVICE_TYPE_MULTIPLIERS = {
+  plumber: 1.2,
+  electrician: 1.5,
+  driver: 1.0,
+  // ...add more as needed
+};
+
 async function snapToRoad({ lat, lng }, apiKey) {
   const url = `https://roads.googleapis.com/v1/snapToRoads?path=${lat},${lng}&interpolate=false&key=${apiKey}`;
   const response = await fetch(url);
@@ -31,11 +38,20 @@ async function snapToRoad({ lat, lng }, apiKey) {
   return { lat, lng };
 }
 
+function calculateCharge(distanceMeters, serviceType) {
+  const baseFare = 1200; // e.g., 200 PKR
+  const perKmRate = 200; // e.g., 50 PKR per km
+  const multiplier = SERVICE_TYPE_MULTIPLIERS[serviceType.toLowerCase()] || 1;
+  const distanceKm = distanceMeters / 1000;
+  return baseFare + (distanceKm * perKmRate * multiplier);
+}
+
 function MapComponent({ onLocationSelect, providers = [], showProviders = false }) {
   const [currentLocation, setCurrentLocation] = useState(null);
   const [directions, setDirections] = useState(null);
   const [selectedProvider, setSelectedProvider] = useState(null);
   const [activeProviderInfo, setActiveProviderInfo] = useState(null); // ✅ for popups
+  const [charge, setCharge] = useState(null);
 
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: "AIzaSyA3FzKFHiA7bUcmOaubinG6wqCZt8Dw7Yk",
@@ -120,8 +136,10 @@ function MapComponent({ onLocationSelect, providers = [], showProviders = false 
           if (status === "OK") {
             setDirections(result);
             const leg = result.routes[0].legs[0];
+            const charge = calculateCharge(leg.distance.value, selectedProvider.service);
             console.log("📏 Distance:", leg.distance.text);
             console.log("⏱ Duration:", leg.duration.text);
+            setCharge(charge);
           } else {
             console.error("❌ Directions request failed:", status);
           }
@@ -185,6 +203,8 @@ function MapComponent({ onLocationSelect, providers = [], showProviders = false 
             {activeProviderInfo.service}
             <br />
             {activeProviderInfo.distance}
+            <br />
+            <span>Estimated Charge: {charge ? `${charge.toFixed(0)} PKR` : ''}</span>
           </div>
         </InfoWindow>
       )}
